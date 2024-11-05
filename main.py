@@ -50,7 +50,7 @@ def main():
         try:
             shutil.rmtree("./result")
         except:
-            st.text("result 目錄不存在")
+            pass
     
         result = model(temp_file_path, show=False, save=True, project='result', name='predict')
 

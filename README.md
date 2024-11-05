@@ -14,7 +14,7 @@
 1. 克隆此儲存庫到本地端：
 
     ```bash
-    git clone https://github.com/yourusername/your-repo-name.git
+    git clone https://github.com/SeisoNeko/Drone_Human_Detect_ui
     ```
 
 2. 進入專案目錄：
