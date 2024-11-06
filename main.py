@@ -18,62 +18,82 @@ def cleanup_temp_dirs():
 atexit.register(cleanup_temp_dirs)
 
 def main():
-    st.title('無人機辨識系統')
-    st.write('本系統使用 RTDETR 模型進行無人機辨識，支持圖片和影片的上傳。')
+    st.title('無人機影像辨識系統')
+    st.write('本系統使用 RTDETR 模型進行無人機影像辨識，支援圖片和影片格式。')
     data_file = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'])
     if data_file is not None:
-
         file_name = data_file.name
-        temp_dir = tempfile.mkdtemp()
-        temp_dirs.append(temp_dir)
-        temp_file_path = os.path.join(temp_dir, data_file.name)
+        if 'processed' not in st.session_state:
+            st.session_state.processed = {}
+        # Process and save results
+        if st.button('開始辨識') or file_name in st.session_state.processed:
+            result = output(data_file, file_name)
+            st.session_state.processed[file_name] = result
 
-        with open(temp_file_path, 'wb') as f:
-            f.write(data_file.getbuffer())
+        if file_name in st.session_state.processed:
+            st.write(f'File: {file_name}')
+            st.write(st.session_state.processed[file_name])
+    else:
+        st.text('請上傳圖片或影片')
 
-        st.text(f"檔案已保存到: {temp_file_path}")
 
-        file_extension = os.path.splitext(data_file.name)[1].lower()
-        if file_extension in ['.mp4', '.mov', '.avi']:
-            # 顯示上傳的影片
-            st.text('原始影像')
-            st.video(temp_file_path)
+def output(data_file, file_name):
+    temp_dir = tempfile.mkdtemp()
+    temp_dirs.append(temp_dir)
+    temp_file_path = os.path.join(temp_dir, data_file.name)
 
-        elif file_extension in ['.png', '.jpg', '.jpeg']:
-            # 顯示上傳的圖片
-            st.text('原始圖片')
-            st.image(temp_file_path)
+    with open(temp_file_path, 'wb') as f:
+        f.write(data_file.getbuffer())
 
-        # 使用 RTDETR 模型進行預測
-        model = RTDETR("model/rtdetr-x.pt")
+    st.text(f"檔案已保存到: {temp_file_path}")
 
-        try:
-            shutil.rmtree("./result")
-        except:
-            pass
+    file_extension = os.path.splitext(data_file.name)[1].lower()
+    if file_extension in ['.mp4', '.mov', '.avi']:
+        # 顯示上傳的影片
+        st.text('原始影像')
+        st.video(temp_file_path)
+
+    elif file_extension in ['.png', '.jpg', '.jpeg']:
+        # 顯示上傳的圖片
+        st.text('原始圖片')
+        st.image(temp_file_path)
+
+    if not file_name in st.session_state.processed:
+        result = inference(temp_file_path)
+
+    # 顯示預測結果
+    output_dir = "result/predict"
+    st.text('預測結果')
     
-        result = model(temp_file_path, show=False, save=True, project='result', name='predict')
+    try :
+        if file_extension in ['.mp4', '.mov', '.avi']:
+            predict_path_avi = os.path.join(output_dir, os.path.splitext(file_name)[0] + '.avi')
+            predict_path_mp4 = os.path.join(output_dir, os.path.splitext(file_name)[0] + '.mp4')
+            
+            # 將 AVI 轉換為 MP4
+            clip = VideoFileClip(predict_path_avi)
+            clip.write_videofile(predict_path_mp4)
+            
+            st.video(predict_path_mp4)
+            with open(predict_path_mp4, 'rb') as f:
+                st.download_button('下載預測影片', f, os.path.splitext(file_name)[0] + '.mp4')
+        elif file_extension in ['.png', '.jpg', '.jpeg']:
+            predict_path = os.path.join(output_dir, file_name)
+            st.image(predict_path)
+            with open(predict_path, 'rb') as f:
+                st.download_button('下載預測照片', f, file_name)
+    except:
+        st.text('預測結果無法顯示')
 
-        # 顯示預測結果
-        output_dir = "result/predict"
-        st.text('預測結果')
-        
-        try :
-            if file_extension in ['.mp4', '.mov', '.avi']:
-                predict_path_avi = os.path.join(output_dir, os.path.splitext(file_name)[0] + '.avi')
-                predict_path_mp4 = os.path.join(output_dir, os.path.splitext(file_name)[0] + '.mp4')
-                
-                # 將 AVI 轉換為 MP4
-                clip = VideoFileClip(predict_path_avi)
-                clip.write_videofile(predict_path_mp4)
-                
-                st.video(predict_path_mp4)
-            elif file_extension in ['.png', '.jpg', '.jpeg']:
-                predict_path = os.path.join(output_dir, file_name)
-                
-                st.image(predict_path)
-        except:
-            st.text('預測結果無法顯示')
+@st.cache_data
+def inference(temp_file_path):
+    # 使用 RTDETR 模型進行預測
+    model = RTDETR("model/rtdetr-x.pt")
+    try:
+        shutil.rmtree("./result")
+    except:
+        pass
+    return model(temp_file_path, show=False, save=True, project='result', name='predict')
 
 if __name__ == '__main__':
     main()
