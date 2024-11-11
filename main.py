@@ -4,6 +4,7 @@ from ultralytics import RTDETR
 import tempfile
 import atexit
 import shutil
+import cv2
 from moviepy.editor import VideoFileClip
 
 # 用於存儲臨時目錄的列表
@@ -17,6 +18,15 @@ def cleanup_temp_dirs():
 # 註冊清理函數
 atexit.register(cleanup_temp_dirs)
 
+def make_log(results, fps):
+    frame = 1
+    with open('log.txt', 'w') as f:
+        for result in results:
+            seconds = str(f"{frame / fps:.2f}")
+            frame += 1
+            if "persons" in result.verbose():
+                f.write(seconds + 's: ' + result.verbose() + '\n')
+            
 
 def choose_place():                                             #之後要加入訓練好的各種模型
     place = st.selectbox('選擇場景', ['山地', '河邊', '海上'])
@@ -52,6 +62,7 @@ def main():
 
 
 def output(data_file, file_name, model=None):
+    global fps
     temp_dir = tempfile.mkdtemp()
     temp_dirs.append(temp_dir)
     temp_file_path = os.path.join(temp_dir, data_file.name)
@@ -66,11 +77,13 @@ def output(data_file, file_name, model=None):
         # 顯示上傳的影片
         st.text('原始影像')
         st.video(temp_file_path)
+        fps = cv2.VideoCapture(temp_file_path).get(cv2.CAP_PROP_FPS)
 
     elif file_extension in ['.png', '.jpg', '.jpeg']:
         # 顯示上傳的圖片
         st.text('原始圖片')
         st.image(temp_file_path)
+        fps = 1
 
     if not file_name in st.session_state.processed:
         results = inference(temp_file_path, model)
@@ -91,11 +104,15 @@ def output(data_file, file_name, model=None):
             st.video(predict_path_mp4)
             with open(predict_path_mp4, 'rb') as f:
                 st.download_button('下載預測影片', f, os.path.splitext(file_name)[0] + '.mp4')
+            with open('log.txt', 'rb') as log:
+                st.download_button('下載預測報告', log, os.path.splitext(file_name)[0] + '.txt')
         elif file_extension in ['.png', '.jpg', '.jpeg']:
             predict_path = os.path.join(output_dir, file_name)
             st.image(predict_path)
             with open(predict_path, 'rb') as f:
                 st.download_button('下載預測照片', f, file_name)
+
+        
     except:
         st.text('預測結果無法顯示')
 
@@ -106,8 +123,8 @@ def inference(temp_file_path, model=None):
     except:
         pass
     
-    result = model(temp_file_path, show=False, save=True, project='result', name='predict')
-    
+    result = model(temp_file_path, show=True, save=True, project='result', name='predict')
+    make_log(result, fps)
     return result
 
 if __name__ == '__main__':
