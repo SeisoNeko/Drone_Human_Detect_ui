@@ -17,17 +17,31 @@ def cleanup_temp_dirs():
 # 註冊清理函數
 atexit.register(cleanup_temp_dirs)
 
+
+def choose_place():                                             #之後要加入訓練好的各種模型
+    place = st.selectbox('選擇場景', ['山地', '河邊', '海上'])
+    if place == '山地':
+        st.write('已選擇山地場景')
+        return RTDETR("model/rtdetr-x.pt")
+    elif place == '河邊':
+        st.write('已選擇河邊場景')
+        return RTDETR("model/rtdetr-x.pt")
+    elif place == '海上':
+        st.write('已選擇海上場景')
+        return RTDETR("model/rtdetr-x.pt")
+
 def main():
     st.title('無人機影像辨識系統')
     st.write('本系統使用 RTDETR 模型進行無人機影像辨識，支援圖片和影片格式。')
     data_file = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'])
+    model = choose_place()
     if data_file is not None:
         file_name = data_file.name
         if 'processed' not in st.session_state:
             st.session_state.processed = {}
         # Process and save results
         if st.button('開始辨識') or file_name in st.session_state.processed:
-            result = output(data_file, file_name)
+            result = output(data_file, file_name, model)
             st.session_state.processed[file_name] = result
 
         if file_name in st.session_state.processed:
@@ -37,7 +51,7 @@ def main():
         st.text('請上傳圖片或影片')
 
 
-def output(data_file, file_name):
+def output(data_file, file_name, model=None):
     temp_dir = tempfile.mkdtemp()
     temp_dirs.append(temp_dir)
     temp_file_path = os.path.join(temp_dir, data_file.name)
@@ -59,7 +73,7 @@ def output(data_file, file_name):
         st.image(temp_file_path)
 
     if not file_name in st.session_state.processed:
-        result = inference(temp_file_path)
+        results = inference(temp_file_path, model)
 
     # 顯示預測結果
     output_dir = "result/predict"
@@ -85,15 +99,16 @@ def output(data_file, file_name):
     except:
         st.text('預測結果無法顯示')
 
-@st.cache_data
-def inference(temp_file_path):
-    # 使用 RTDETR 模型進行預測
-    model = RTDETR("model/rtdetr-x.pt")
+def inference(temp_file_path, model=None):
+
     try:
         shutil.rmtree("./result")
     except:
         pass
-    return model(temp_file_path, show=False, save=True, project='result', name='predict')
+    
+    result = model(temp_file_path, show=False, save=True, project='result', name='predict')
+    
+    return result
 
 if __name__ == '__main__':
     main()
