@@ -3,5 +3,4 @@ __pycache__/
 *$py.class
 source
 model
-result
-log.txt
+rtdetr/weights/
