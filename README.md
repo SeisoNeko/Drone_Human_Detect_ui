@@ -11,7 +11,7 @@
 
 ## 安裝
 
-1. 複製到本地端：
+1. 克隆此儲存庫到本地端：
 
     ```bash
     git clone https://github.com/SeisoNeko/Drone_Human_Detect_ui
