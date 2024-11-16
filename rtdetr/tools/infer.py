@@ -112,7 +112,7 @@ def draw(images, labels, boxes, scores, thrh = 0.6, path = ""):
         box_count += len(box)
         for j,b in enumerate(box):
             draw.rectangle(list(b), outline='red',)
-            draw.text((b[0], b[1]), text=f"label: {lab[j].item()} {round(scrs[j].item(),2)}", font=ImageFont.load_default(), fill='blue')
+            draw.text((b[0], b[1]), text=f"human: {lab[j].item()} {round(scrs[j].item(),2)}", font=ImageFont.load_default(), fill='blue')
         return im, box_count
 def initModel(args):
     print("Load parameters")
@@ -250,13 +250,13 @@ def Inference(args):
                 detect_frame = draw([im_pil], labels, boxes, scores, 0.5)
                 frame_out = cv2.cvtColor(np.array(detect_frame), cv2.COLOR_RGB2BGR)
                 cv2.imwrite(os.path.join(new_path,f"{video_name}.jpg"),frame_out)
-def InitArgs(imfile, video, outputdir):
+def InitArgs(imfile, video, outputdir, device):
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', type=str, default=r"rtdetr\configs\rtdetr\drone_sealand.yml")
-    parser.add_argument('-r', '--resume', type=str, default=r"rtdetr\weights\checkpoint0022.pth")
+    parser.add_argument('-r', '--resume', type=str, default=r"rtdetr\weights\checkpoint0029.pth")  #要改model暫時先從這裡改
     parser.add_argument('-f', '--imfile', type=str, default=imfile)
     parser.add_argument('-s', '--sliced', type=bool, default=False)
-    parser.add_argument('-d', '--device', type=str, default='cpu')
+    parser.add_argument('-d', '--device', type=str, default=device)
     parser.add_argument('-nc', '--numberofboxes', type=int, default=25)
     parser.add_argument('-o', '--outputdir', type=str, default= outputdir)
     parser.add_argument('-v', '--video', type=bool, default=video)

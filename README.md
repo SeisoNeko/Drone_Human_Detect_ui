@@ -11,7 +11,7 @@
 
 ## 安裝
 
-1. 克隆此儲存庫到本地端：
+1. 複製此儲存庫到本地端：
 
     ```bash
     git clone https://github.com/SeisoNeko/Drone_Human_Detect_ui
@@ -36,6 +36,17 @@
     pip install -r requirements.txt
     ```
 
+5. 安裝對應版本的pytorch
+    請參考 https://pytorch.org/ 並選取適合本地裝置的版本進行安裝
+    舉例: windows用戶並且使用cuda 11.8 請使用
+    ```bash
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    ```
+
+6. 放入model
+    請致 rtdetr/weights/ 放入合適的model pth檔 
+    並到 rtdetr\tools\infer.py 第256行 輸入model路徑
+
 ## 使用方法
 
 1. 啟動 Streamlit 應用：
@@ -44,7 +55,12 @@
     streamlit run main.py
     ```
 
-2. 在瀏覽器中打開 `http://localhost:8501`，上傳圖片或影片進行無人機辨識。
+2. 或者 執行run.py
+    ```bash
+    python run.py
+    ```
+
+3. 在瀏覽器中打開 `http://localhost:8501`，上傳圖片或影片進行無人機辨識。
 
 ## 專案結構
 
