@@ -15,12 +15,20 @@ import argparse
 from tqdm import tqdm
 from rtdetr.tools.infer import InitArgs, draw, initModel
 
+video_format = ['mp4', 'mov', 'avi', 'MP4', 'MOV', 'AVI']
+image_format = ['png', 'jpg', 'jpeg', 'PNG', 'JPG', 'JPEG']
 
 def main():
     st.title('無人機人員偵測系統')
     
     # upload the file
-    uploaded_file = st.file_uploader("請上傳影片", type=['mp4'])
+    uploaded_file = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'])
+
+    try:
+        file_extension = uploaded_file.name.split('.')[-1]
+        print(file_extension)
+    except:
+        pass
 
     choose_device = st.selectbox("選擇預測使用裝置", ["CPU", "GPU"])
     if choose_device == "CPU":
@@ -38,22 +46,27 @@ def main():
             st.session_state.last_uploaded_file = uploaded_file.name
             st.session_state.infer_correct = False  # 重置 infer_correct 變數
 
-        upload_success = st.success("影片已成功上傳！")
-        st.video(uploaded_file)
-
+        upload_success = st.success("檔案已成功上傳！")
+        if file_extension in image_format:
+            st.image(uploaded_file)
+        elif file_extension in video_format:    
+            st.video(uploaded_file)
+        else:
+            st.warning("檔案格式不支援！")
+            return
 
         # create dir of to save the input file and inference outcome
-        video_name = uploaded_file.name.split('.')[0]
-        os.makedirs(f"inputFile/{video_name}", exist_ok=True)
-        output_path = f"outputFile/{video_name}"
+        file_name = uploaded_file.name.split('.')[0]
+        os.makedirs(f"inputFile/{file_name}", exist_ok=True)
+        output_path = f"outputFile/{file_name}"
         os.makedirs(output_path, exist_ok=True)
 
         # copy the video to inputFile
-        save_path = f"inputFile/{video_name}/{uploaded_file.name}"
+        save_path = f"inputFile/{file_name}/{uploaded_file.name}"
         with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         fps = cv2.VideoCapture(save_path).get(cv2.CAP_PROP_FPS)
-        print("fps ",fps)
+        print("fps: ",fps)
             
         # Create the parser for inference and init the model
         # The reason I put the initialize and model here \
@@ -63,7 +76,7 @@ def main():
         # close the success message    
         upload_success.empty()
         
-        save_success = st.success(f"影片已儲存至 {save_path}")
+        save_success = st.success(f"檔案已儲存至 {save_path}")
         save_success.empty()
         
         detect_annotation = None
@@ -78,14 +91,15 @@ def main():
         detect_annotation = st.session_state.detect_annotation
 
         if detect_annotation is not None:
-            output_path = f"outputFile/{video_name}/output.mp4"
+            output_path = f"outputFile/{file_name}/output.mp4"
             st.text("推理結果")
             st.video(output_path)
-            make_log(detect_annotation, fps)
             with open(output_path, "rb") as f:
-                st.download_button('下載預測影片', f, os.path.splitext(video_name)[0] + '.mp4')
-            with open('log.txt', "rb") as f:
-                st.download_button('下載偵測時間', f, 'log.txt')
+                st.download_button('下載預測檔案', f, os.path.splitext(file_name)[0] + '.mp4')
+            if file_extension in video_format:
+                make_log(detect_annotation, fps, file_name)
+                with open(os.path.join("log", file_name + '.txt'), "rb") as f:
+                    st.download_button('下載偵測時間', f, file_name+'.txt')
             
         else:
             pass
@@ -138,7 +152,8 @@ def infer(args, model):
         if not cap.isOpened():
             print("cap can not open")
             exit()
-
+        # Diplay inference result in real time
+        frame_placeholder = st.empty()
         while cap.isOpened():
             
             ret, frame = cap.read()
@@ -168,6 +183,8 @@ def infer(args, model):
             detect_frame, box_count = draw([im_pil], labels, boxes, scores, 0.5)
             
             frame_out = cv2.cvtColor(np.array(detect_frame), cv2.COLOR_RGB2BGR)
+            # Display inference result
+            frame_placeholder.image(frame_out, channels="BGR", use_container_width=True)
             output_video.write(frame_out)
             
             # Update the progress bar
@@ -191,8 +208,10 @@ def infer(args, model):
             st.success("推理完成")
         return detect_annotation
          
-def make_log(detect_annotation, fps):
-    with open('log.txt', 'w') as f:
+def make_log(detect_annotation, fps, file_name):
+    os.makedirs("log", exist_ok=True)
+    log_path = os.path.join("log", file_name + '.txt')
+    with open(log_path, 'w') as f:
         f.write("偵測到的人員在以下秒數：\n")
         for i in detect_annotation:
             f.write(f"{i/fps:.2f}秒\n")

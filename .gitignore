@@ -131,7 +131,8 @@ cython_debug/
 source
 model
 rtdetr/weights/
-training_log
+trained_model_pth
+log
 result
 log.txt
 inputFile
