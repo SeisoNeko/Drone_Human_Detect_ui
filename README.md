@@ -23,7 +23,7 @@
     cd Drone_Human_Detect_ui
     ```
 
-3. 建立並啟動虛擬環境：
+3. 建立並啟動虛擬環境(推薦)：
 
     ```bash
     conda create -n yourProjectName python=3.8  #3.8以上
@@ -32,18 +32,19 @@
 
 4. 安裝所需的套件：
 
+    **Windows:**
     ```bash
-    pip install -r requirements.txt
+    install.bat
     ```
 
-5. 安裝對應版本的pytorch  
-    請參考 https://pytorch.org/ 並選取適合本地裝置的版本進行安裝  
-    舉例: windows用戶並且使用cuda 11.8 請使用
+    **Linux:**
+
     ```bash
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+    ./install.sh
     ```
 
-6. 放入model  
+
+5. 放入model  
     請致 rtdetr/weights/ 放入合適的model pth檔  
     並到 rtdetr\tools\infer.py 第256行 輸入model路徑
 
