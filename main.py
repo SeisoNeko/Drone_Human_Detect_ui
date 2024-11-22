@@ -14,6 +14,7 @@ import time
 import argparse
 from tqdm import tqdm
 from rtdetr.tools.infer import InitArgs, draw, initModel
+from anomalyDET import anomaly_main
 
 video_format = ['mp4', 'mov', 'avi', 'MP4', 'MOV', 'AVI']
 image_format = ['png', 'jpg', 'jpeg', 'PNG', 'JPG', 'JPEG']
@@ -215,8 +216,13 @@ def make_log(detect_annotation, fps, file_name):
         f.write("偵測到的人員在以下秒數：\n")
         for i in detect_annotation:
             f.write(f"{i/fps:.2f}秒\n")
-            
+
             
 if __name__ == '__main__':
-    main()
+    st.sidebar.title('選用預測方法')
+    page = st.sidebar.selectbox("選擇預測方法", ("模型偵測系統", "異常偵測系統"))
+    if page == "模型偵測系統":
+        main()
+    else:
+        anomaly_main()
     
