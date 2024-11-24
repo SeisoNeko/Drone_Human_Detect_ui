@@ -1,18 +1,15 @@
 import streamlit as st
 import os
 import torch
-import torch.nn as nn 
 import torchvision.transforms as T
-from torch.cuda.amp import autocast
 import numpy as np 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 import sys 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 import numpy as np
 import cv2
-import time
-import argparse
-from tqdm import tqdm
+import zipfile
+import shutil
 from rtdetr.tools.infer import InitArgs, draw, initModel
 from anomalyDET import anomaly_main
 
@@ -23,88 +20,119 @@ def main():
     st.title('無人機人員偵測系統')
     
     # upload the file
-    uploaded_file = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'])
+    uploaded_files = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'], accept_multiple_files=True)
 
-    try:
-        file_extension = uploaded_file.name.split('.')[-1]
-        print(file_extension)
-    except:
-        pass
-
-    choose_device = st.selectbox("選擇預測使用裝置", ["CPU", "GPU"])
-    if choose_device == "CPU":
-        device = "cpu"
-    else:
-        device = "cuda:0"
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    if uploaded_file is not None:
-        
+    if uploaded_files is not None:
         # 重置 session state 變數
-        if 'last_uploaded_file' not in st.session_state:
-            st.session_state.last_uploaded_file = None
-        if st.session_state.last_uploaded_file != uploaded_file.name:
-            st.session_state.detect_annotation = None
-            st.session_state.last_uploaded_file = uploaded_file.name
-            st.session_state.infer_correct = False  # 重置 infer_correct 變數
+        if 'last_uploaded_files' not in st.session_state:
+            st.session_state.last_uploaded_files = []
+        if 'detect_annotations' not in st.session_state:
+            st.session_state.detect_annotations = {}
+        if 'infer_correct' not in st.session_state:
+            st.session_state.infer_correct = False
 
-        upload_success = st.success("檔案已成功上傳！")
-        if file_extension in image_format:
-            st.image(uploaded_file)
-        elif file_extension in video_format:    
-            st.video(uploaded_file)
-        else:
-            st.warning("檔案格式不支援！")
-            return
+        for uploaded_file in uploaded_files:
+            file_name = uploaded_file.name
+            file_extension = file_name.split('.')[-1]
 
-        # create dir of to save the input file and inference outcome
-        file_name = uploaded_file.name.split('.')[0]
-        os.makedirs(f"inputFile/{file_name}", exist_ok=True)
-        output_path = f"outputFile/{file_name}"
-        os.makedirs(output_path, exist_ok=True)
+            if file_name not in st.session_state.last_uploaded_files:
+                st.session_state.detect_annotations[file_name] = None
+                st.session_state.last_uploaded_files.append(file_name)
 
-        # copy the video to inputFile
-        save_path = f"inputFile/{file_name}/{uploaded_file.name}"
-        with open(save_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        fps = cv2.VideoCapture(save_path).get(cv2.CAP_PROP_FPS)
-        print("fps: ",fps)
+            upload_success = st.success(f"檔案 {file_name} 已成功上傳！")
+            if file_extension in image_format:
+                st.image(uploaded_file)
+            elif file_extension in video_format:    
+                st.video(uploaded_file)
+            else:
+                st.warning(f"檔案 {file_name} 格式不支援！")
+                continue
+
+            # create dir of to save the input file and inference outcome
+            base_name = file_name.split('.')[0]
+            os.makedirs(f"inputFile/{base_name}", exist_ok=True)
+            output_path = f"outputFile/{base_name}"
+            os.makedirs(output_path, exist_ok=True)
+
+            # copy the video to inputFile
+            save_path = f"inputFile/{base_name}/{file_name}"
+            with open(save_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            fps = cv2.VideoCapture(save_path).get(cv2.CAP_PROP_FPS)
+            print("fps: ", fps)
+                
+            # close the success message    
+            upload_success.empty()
             
-        # Create the parser for inference and init the model
-        # The reason I put the initialize and model here \
-        # is the time for inferecne will be shorter
-        args = InitArgs(save_path, True, output_path, device)
-        model = initModel(args)
-        # close the success message    
-        upload_success.empty()
+            save_success = st.success(f"檔案已儲存至 {save_path}")
+            save_success.empty()
         
-        save_success = st.success(f"檔案已儲存至 {save_path}")
-        save_success.empty()
-        
-        detect_annotation = None
-        # Initialize session state for inference results
-        if 'detect_annotation' not in st.session_state:
-            st.session_state.detect_annotation = None
-        
+        # 顯示「開始推理」按鈕
+        if st.button("開始推理所有檔案"):
+            st.session_state.infer_correct = True
+
         # Start to inference if not already done
-        if st.session_state.detect_annotation is None:
-            st.session_state.detect_annotation = infer(args, model)
-        
-        detect_annotation = st.session_state.detect_annotation
+        if st.session_state.infer_correct:
+            for uploaded_file in uploaded_files:
+                file_name = uploaded_file.name
+                if st.session_state.detect_annotations[file_name] is None:
+                    base_name = file_name.split('.')[0]
+                    file_extension = file_name.split('.')[-1]
+                    save_path = f"inputFile/{base_name}/{file_name}"
+                    output_path = f"outputFile/{base_name}"
+                    args = InitArgs(save_path, True, output_path, device)
+                    model = initModel(args)
+                    st.session_state.detect_annotations[file_name] = infer(args, model, base_name)
+                    if file_extension in video_format:
+                        st.video(os.path.join(output_path, base_name+".mp4"))
+                        log_path = make_log(st.session_state.detect_annotations[file_name], fps, base_name)
+                        st.success(f"偵測結果已儲存至 {log_path}")
 
-        if detect_annotation is not None:
-            output_path = f"outputFile/{file_name}/output.mp4"
-            st.text("推理結果")
-            st.video(output_path)
-            with open(output_path, "rb") as f:
-                st.download_button('下載預測檔案', f, os.path.splitext(file_name)[0] + '.mp4')
-            if file_extension in video_format:
-                make_log(detect_annotation, fps, file_name)
-                with open(os.path.join("log", file_name + '.txt'), "rb") as f:
-                    st.download_button('下載偵測時間', f, file_name+'.txt')
+            # 提供下載壓縮檔案的按鈕
+            zip_path = zip_output_files()
+            with open(zip_path, "rb") as f:
+                st.download_button('下載所有預測檔案', f, 'output_files.zip')
             
-        else:
-            pass
-            
+            # 提供下載log檔案的按鈕
+            log_zip_path = zip_log_files()
+            with open(log_zip_path, "rb") as f:
+                st.download_button('下載所有log檔案', f, 'log_files.zip')
+
+            # 清理掉臨時檔案
+    st.button("清理臨時檔案", on_click=lambda: cleanup_files())
+
+def zip_output_files():
+    zip_path = "output_files.zip"
+    with zipfile.ZipFile(zip_path, 'w') as zipf:
+        for root, dirs, files in os.walk("outputFile"):
+            for file in files:
+                zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), "outputFile"))
+    return zip_path
+
+def zip_log_files():
+    log_zip_path = "log_files.zip"
+    with zipfile.ZipFile(log_zip_path, 'w') as zipf:
+        for root, dirs, files in os.walk("log"):
+            for file in files:
+                zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), "log"))
+    return log_zip_path
+
+def cleanup_files():
+    try:
+        shutil.rmtree("inputFile", ignore_errors=True)
+        shutil.rmtree("outputFile", ignore_errors=True)
+        shutil.rmtree("log", ignore_errors=True)
+        os.remove("output_files.zip")
+        os.remove("log_files.zip")
+        st.success("成功清理所有臨時檔案.")
+        st.session_state.last_uploaded_files = []
+        st.session_state.detect_annotations = {}
+        st.session_state.infer_correct = False
+    except OSError as e:
+        st.error(f"清除檔案失敗: {e}")
+    
 # '''
 # Infer function : 
 #     parameters: 
@@ -117,7 +145,7 @@ def main():
 #     To do:
 #         If the video is too long maybe we can crop the video and than start to inference
 # '''
-def infer(args, model):
+def infer(args, model, name, format = 'video'):
     if 'infer_correct' not in st.session_state:
         st.session_state.infer_correct = False
 
@@ -138,16 +166,15 @@ def infer(args, model):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
         # set output video type .mp4
-        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
-
-        output_video = cv2.VideoWriter(os.path.join(args.outputdir,"output.mp4"), fourcc, fps, (width, height))
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        output_video = cv2.VideoWriter(os.path.join(args.outputdir, name+".mp4"), fourcc, fps, (width, height))
         
         # Initialize the progress bar with the total number of frames
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         progress_bar = st.progress(0)  # Progress bar initialized at 0%
         
         # Create a button to interrupt the inference
-        interrupt_button = st.button('中斷推理')  
+        interrupt_button = st.button('中斷推理', key=name)
         is_interrupted = False
         
         if not cap.isOpened():
@@ -216,8 +243,9 @@ def make_log(detect_annotation, fps, file_name):
         f.write("偵測到的人員在以下秒數：\n")
         for i in detect_annotation:
             f.write(f"{i/fps:.2f}秒\n")
-
             
+    return log_path
+
 if __name__ == '__main__':
     st.sidebar.title('選用預測方法')
     page = st.sidebar.selectbox("選擇預測方法", ("模型偵測系統", "異常偵測系統"))
