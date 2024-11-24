@@ -137,4 +137,5 @@ result
 log.txt
 inputFile
 outputFile
+outputZip
 torchTest.py
