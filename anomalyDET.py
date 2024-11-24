@@ -3,7 +3,10 @@ import cv2
 import numpy as np
 import tempfile
 import os
+import time
 
+input_tempfile_path = []
+output_tempfile_path = []
 
 # 定義增強與降低亮度的函數
 def enhance_and_downgrade_colors(image, target_colors, downgrade_colors, tolerance=50, downgrade_factor=0.5):
@@ -12,7 +15,7 @@ def enhance_and_downgrade_colors(image, target_colors, downgrade_colors, toleran
     target_mask_total = np.zeros(image.shape[:2], dtype=np.uint8)
     downgrade_mask_total = np.zeros(image.shape[:2], dtype=np.uint8)
 
-    # 噌強目標顏色
+    # 增強目標顏色
     for target_rgb in target_colors:
         lower_bound = np.clip(np.array(target_rgb) - tolerance, 0, 255)
         upper_bound = np.clip(np.array(target_rgb) + tolerance, 0, 255)
@@ -57,8 +60,9 @@ def process_video(input_video_path, output_video_path, target_colors, downgrade_
     # 初始化進度條
     progress_bar = st.progress(0)
 
+    frame_placeholder = st.empty()
     frame_count = 0
-    while True:
+    while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
@@ -82,6 +86,7 @@ def process_video(input_video_path, output_video_path, target_colors, downgrade_
         combined_display[:frame_height, :] = frame  # 上 原影片
         combined_display[frame_height:, :] = anomaly_map_color  # 下 黑白異常圖
 
+        frame_placeholder.image(combined_display, channels="BGR")
         # 儲存輸出影片
         out.write(combined_display)
 
@@ -97,12 +102,16 @@ def anomaly_main():
     st.title("異物檢測系統")
 
     # 上傳影片
-    uploaded_video = st.file_uploader("上傳影片", type=["mp4", "avi", "mov"])
+    uploaded_video = st.file_uploader("上傳影片", type=["mp4", "avi", "mov", "MP4", "AVI", "MOV"])
     if uploaded_video:
+        file_name = uploaded_video.name.split(".")[0] # 取得檔案名稱
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as input_temp:
             input_temp.write(uploaded_video.read())
             input_video_path = input_temp.name
+            input_tempfile_path.append(input_video_path)
+            print(input_video_path)
 
+        st.video(input_video_path)
         # 選擇目標顏色
         color_hex = st.color_picker("選擇想要增強的顏色", "#FFCC99")  # 初始值為皮膚色
         selected_color = tuple(int(color_hex.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
@@ -118,7 +127,7 @@ def anomaly_main():
         # 設置參數
         rx_threshold = st.slider("RX Detection 強度", min_value=1, max_value=100, value=40, help='數值越高，檢測越嚴格，偵測到的異常越少，雜訊越少')
         tolerance = st.slider("顏色差異容許度", min_value=1, max_value=100, value=50, help='數值越高，容許的顏色差異越大')
-        downgrade_factor = st.slider("Brightness Downgrade Factor", min_value=0.0, max_value=1.0, value=0.5)
+        downgrade_factor = st.slider("削弱顏色強度", min_value=0.0, max_value=1.0, value=0.5, help='數值越低，過濾顏色越多')
 
         # 保存輸出影片的選項
         save_output = st.checkbox("保存輸出影片")
@@ -127,6 +136,8 @@ def anomaly_main():
         if st.button("開始偵測"):
             output_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
             output_video_path = output_temp.name
+            output_tempfile_path.append(output_video_path)
+            print(output_video_path)
 
             target_colors = [selected_color]
             downgrade_colors = [downgrade_color]
@@ -143,19 +154,33 @@ def anomaly_main():
                     btn = st.download_button(
                         label="Download Video",
                         data=file,
-                        file_name="processed_video.mp4",
+                        file_name= file_name +"_processed.mp4",
                         mime="video/mp4"
                     )
 
             # 清理掉臨時檔案
             if not save_output:
-                try:
-                    if os.path.exists(input_video_path):
-                        os.remove(input_video_path)
-                    if os.path.exists(output_video_path):
-                        os.remove(output_video_path)
-                except Exception as e:
-                    st.warning(f"刪除下列影片時出現錯誤: {e}" + '\n' + f"請手動刪除")
+                st.button("清理臨時檔案", on_click=lambda: cleanup_files())
+
+def cleanup_files():
+    time.sleep(2)  
+
+    for path in input_tempfile_path:
+        try:
+            os.remove(path)
+            st.success("成功清理輸入影片檔案.")
+        except OSError as e:
+            st.error(f"清除輸入影片失敗: {e}")
+
+    for path in output_tempfile_path:
+        try:
+            os.remove(path)
+            st.success("成功清理輸出影片檔案.")
+        except OSError as e:
+            st.error(f"清除輸出影片失敗: {e}")
+
+    input_tempfile_path.clear()
+    output_tempfile_path.clear()
 
 if __name__ == '__main__':
     anomaly_main()
