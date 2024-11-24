@@ -75,7 +75,6 @@
 - Python 3.8+
 - Streamlit
 - ultralytics
-- moviepy
 - PIL (Pillow)
 
 ## 貢獻
