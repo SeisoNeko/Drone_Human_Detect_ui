@@ -83,5 +83,5 @@
 
 ## 授權
 
-此專案使用 MIT 授權。詳情請參閱 [LICENSE](LICENSE) 文件。"# Drone_Human_Detect_ui" 
+此專案使用 Apache 2.0 授權。詳情請參閱 [LICENSE](LICENSE) 文件。"# Drone_Human_Detect_ui" 
 "# Drone_Human_Detect_ui" 
