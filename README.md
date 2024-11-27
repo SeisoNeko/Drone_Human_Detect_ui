@@ -79,9 +79,8 @@
 
 ## 貢獻
 
-歡迎提交問題和請求合併。如果您想貢獻代碼，請先分叉此儲存庫，創建一個分支，提交您的更改，然後創建一個 Pull Request。
+歡迎提交問題和請求合併。如果您想貢獻代碼，創建一個 Pull Request。
 
 ## 授權
 
-此專案使用 Apache 2.0 授權。詳情請參閱 [LICENSE](LICENSE) 文件。"# Drone_Human_Detect_ui" 
-"# Drone_Human_Detect_ui" 
+此專案使用 Apache 2.0 授權。詳情請參閱 [LICENSE](LICENSE) 文件。
