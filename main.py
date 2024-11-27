@@ -32,6 +32,8 @@ def main():
             st.session_state.detect_annotations = {}
         if 'infer_correct' not in st.session_state:
             st.session_state.infer_correct = False
+        if 'has_infer_result' not in st.session_state:
+            st.session_state.has_infer_result = False
 
         for uploaded_file in uploaded_files:
             file_name = uploaded_file.name
@@ -70,8 +72,8 @@ def main():
             save_success.empty()
         
         # 顯示「開始推理」按鈕
-        if st.button("開始推理所有檔案"):
-            st.session_state.infer_correct = True
+        if st.session_state.infer_correct == False and st.session_state.last_uploaded_files != []:
+            st.session_state.infer_correct = st.button("開始推理")
 
         # Start to inference if not already done
         if st.session_state.infer_correct:
@@ -89,7 +91,10 @@ def main():
                         st.video(os.path.join(output_path, base_name+".mp4"))
                         log_path = make_log(st.session_state.detect_annotations[file_name], fps, base_name)
                         st.success(f"偵測結果已儲存至 {log_path}")
+            st.session_state.infer_correct = False
+            st.session_state.has_infer_result = True
 
+        if st.session_state.has_infer_result:
             # 提供下載壓縮檔案的按鈕
             zip_path = zip_output_files()
             with open(zip_path, "rb") as f:
@@ -130,8 +135,10 @@ def cleanup_files():
         st.session_state.last_uploaded_files = []
         st.session_state.detect_annotations = {}
         st.session_state.infer_correct = False
+        st.session_state.has_infer_result = False
     except OSError as e:
         st.error(f"清除檔案失敗: {e}")
+        pass
     
 # '''
 # Infer function : 
@@ -146,15 +153,6 @@ def cleanup_files():
 #         If the video is too long maybe we can crop the video and than start to inference
 # '''
 def infer(args, model, name, format = 'video'):
-    if 'infer_correct' not in st.session_state:
-        st.session_state.infer_correct = False
-
-    def toggle_infer():
-        st.session_state.infer_correct = not st.session_state.infer_correct
-    button_placeholder = st.empty()
-
-    if not st.session_state.infer_correct:
-        button_placeholder.button("開始 Inference", on_click=toggle_infer)
 
     detect_annotation = []
     if st.session_state.infer_correct:
@@ -189,6 +187,7 @@ def infer(args, model, name, format = 'video'):
                 print("Frame end or can not read frame")
                 break
             if interrupt_button:
+                st.session_state.infer_correct = False
                 is_interrupted = True
                 st.warning("推理已中斷！")
                 break  # Break the loop to stop the inference
