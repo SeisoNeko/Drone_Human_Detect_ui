@@ -8,6 +8,7 @@ REM 安裝CUDA Toolkit 11.8
 WHERE nvcc >nul 2>&1
 IF %ERRORLEVEL% EQU 0 (
     ECHO [92mCUDA已安裝...[0m
+    goto PIP
     )
 IF NOT %ERRORLEVEL% EQU 0 (
     set /p "cuda=尚未安裝CUDA Toolkit，是否要安裝？(y/n):"
@@ -17,6 +18,7 @@ IF %cuda% EQU y (
     start /wait cuda_11.8.0_windows_network.exe
 )
 
+:PIP
 set /p "pip=是否要安裝Python library？(y/n):"
 
 IF %pip% EQU n (
