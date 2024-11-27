@@ -5,7 +5,7 @@ WHERE pip >nul 2>&1
 IF %ERRORLEVEL% NEQ 0 ECHO [101mPython未安裝，請先安裝Python...[0m && PAUSE && EXIT /B 1
 
 REM 安裝CUDA Toolkit 11.8
-WHERE nvcci >nul 2>&1
+WHERE nvcc >nul 2>&1
 IF %ERRORLEVEL% EQU 0 (
     ECHO [92mCUDA已安裝...[0m
     )
