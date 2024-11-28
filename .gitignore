@@ -139,3 +139,5 @@ inputFile
 outputFile
 outputZip
 torchTest.py
+log_files.zip
+output_files.zip
