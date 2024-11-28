@@ -21,9 +21,8 @@ def main():
     
     # upload the file
     uploaded_files = st.file_uploader('上傳圖片/影像', type=['mp4', 'mov', 'avi', 'png', 'jpg', 'jpeg'], accept_multiple_files=True)
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+    Video_Type = []
     if uploaded_files is not None:
         # 重置 session state 變數
         if 'last_uploaded_files' not in st.session_state:
@@ -38,6 +37,15 @@ def main():
         for uploaded_file in uploaded_files:
             file_name = uploaded_file.name
             file_extension = file_name.split('.')[-1]
+            
+            # classify the input file is video or image
+            if file_extension in video_format:
+                Video_Type.append(True)     # 代表輸入類型為影片檔
+            elif file_extension in image_format:
+                Video_Type.append(False)
+            else:
+                st.warning(f"檔案 {file_name} 格式不支援！")
+                continue
 
             if file_name not in st.session_state.last_uploaded_files:
                 st.session_state.detect_annotations[file_name] = None
@@ -54,16 +62,29 @@ def main():
 
             # create dir of to save the input file and inference outcome
             base_name = file_name.split('.')[0]
-            os.makedirs(f"inputFile/{base_name}", exist_ok=True)
-            output_path = f"outputFile/{base_name}"
-            os.makedirs(output_path, exist_ok=True)
+            if Video_Type[-1]:  # 影片檔
+                input_dir = os.path.join("inputFile", base_name)
+            else:  # 圖片檔
+                input_dir = os.path.join("inputFile", "photo")
+            output_dir = os.path.join("outputFile", base_name)
+            
+            try:
+                os.makedirs(input_dir, exist_ok=True)
+                if Video_Type[-1]:  # 圖片需要輸出目錄
+                    os.makedirs(output_dir, exist_ok=True)
+            except Exception as e:
+                st.error(f"目錄創建失敗：{e}")
+                continue
+
 
             # copy the video to inputFile
-            save_path = f"inputFile/{base_name}/{file_name}"
-            with open(save_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            fps = cv2.VideoCapture(save_path).get(cv2.CAP_PROP_FPS)
-            print("fps: ", fps)
+            save_path = os.path.join(input_dir, file_name)
+            try:
+                with open(save_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                fps = cv2.VideoCapture(save_path).get(cv2.CAP_PROP_FPS)
+            except Exception as e:
+                st.error(f"文件保存失敗：{e}")
                 
             # close the success message    
             upload_success.empty()
@@ -77,14 +98,17 @@ def main():
 
         # Start to inference if not already done
         if st.session_state.infer_correct:
-            for uploaded_file in uploaded_files:
+            for i, uploaded_file in enumerate(uploaded_files):
                 file_name = uploaded_file.name
                 if st.session_state.detect_annotations[file_name] is None:
                     base_name = file_name.split('.')[0]
                     file_extension = file_name.split('.')[-1]
                     save_path = f"inputFile/{base_name}/{file_name}"
                     output_path = f"outputFile/{base_name}"
-                    args = InitArgs(save_path, True, output_path, device)
+                    if not Video_Type[i]:   
+                        save_path = f"inputFile/photo/{file_name}"
+                        output_path = f"outputFile/photo"
+                    args = InitArgs(save_path, Video_Type[i], output_path, device)
                     model = initModel(args)
                     st.session_state.detect_annotations[file_name] = infer(args, model, base_name)
                     if file_extension in video_format:
@@ -149,51 +173,92 @@ def cleanup_files():
 #     function:
 #         1. Inference the data from user input 
 #         2. The interrupt button to stop the inference
-#     To do:
-#         If the video is too long maybe we can crop the video and than start to inference
+#         3. real time inference strealit: 0.5(s), cv2: 0.01(s) 
 # '''
-def infer(args, model, name, format = 'video'):
+def infer(args, model, name):
 
     detect_annotation = []
     if st.session_state.infer_correct:
-        cap = cv2.VideoCapture(args.imfile)
-        
-        # get the fps, w, h, if the input video
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        
-        # set output video type .mp4
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')
-        output_video = cv2.VideoWriter(os.path.join(args.outputdir, name+".mp4"), fourcc, fps, (width, height))
-        
-        # Initialize the progress bar with the total number of frames
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        progress_bar = st.progress(0)  # Progress bar initialized at 0%
-        
-        # Create a button to interrupt the inference
-        interrupt_button = st.button('中斷推理', key=name)
-        is_interrupted = False
-        
-        if not cap.isOpened():
-            print("cap can not open")
-            exit()
-        # Diplay inference result in real time
-        frame_placeholder = st.empty()
-        while cap.isOpened():
+        if args.video: # Add classify video type
+            cap = cv2.VideoCapture(args.imfile)
             
-            ret, frame = cap.read()
-            if not ret:
-                print("Frame end or can not read frame")
-                break
-            if interrupt_button:
-                st.session_state.infer_correct = False
-                is_interrupted = True
-                st.warning("推理已中斷！")
-                break  # Break the loop to stop the inference
+            # get the fps, w, h, if the input video
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
+            # set output video type .mp4
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            output_video = cv2.VideoWriter(os.path.join(args.outputdir, name+".mp4"), fourcc, fps, (width, height))
+            
+            # Initialize the progress bar with the total number of frames
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            progress_bar = st.progress(0)  # Progress bar initialized at 0%
+            
+            # Create a button to interrupt the inference
+            interrupt_button = st.button('中斷推理', key=name)
+            is_interrupted = False
+            
+            if not cap.isOpened():
+                print("cap can not open")
+                exit()
+            # Diplay inference result in real time
+            # frame_placeholder = st.empty()
+            while cap.isOpened():
                 
-            # change the graph type from bgr to rgb 
-            im_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                ret, frame = cap.read()
+                if not ret:
+                    print("Frame end or can not read frame")
+                    break
+                if interrupt_button:
+                    st.session_state.infer_correct = False
+                    is_interrupted = True
+                    st.warning("推理已中斷！")
+                    break  # Break the loop to stop the inference
+                    
+                # change the graph type from bgr to rgb 
+                im_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                w, h = im_pil.size
+                orig_size = torch.tensor([w, h])[None].to(args.device)
+            
+                # Resize the graph and change to tensor type to inference
+                transforms = T.Compose([
+                    T.Resize((640, 640)),  
+                    T.ToTensor(),
+                ])
+                im_data = transforms(im_pil)[None].to(args.device)
+                    
+                output = model(im_data, orig_size)
+                labels, boxes, scores = output
+                    
+                detect_frame, box_count = draw([im_pil], labels, boxes, scores, 0.35)
+                frame_out = cv2.cvtColor(np.array(detect_frame), cv2.COLOR_RGB2BGR)
+                # Display inference result
+                cv2.imshow("Real time Inference", cv2.resize(frame_out, (800, 600)))
+                cv2.waitKey(1)
+                
+                output_video.write(frame_out)
+                
+                # Update the progress bar
+                current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
+                progress = current_frame / total_frames
+                progress_bar.progress(progress)  # Update progress bar
+                print(f"Progress: {current_frame} / {total_frames}")
+
+                # Collect the frame that is detected
+                if  box_count > 0:
+                    detect_annotation.append(current_frame)
+            cap.release()
+            output_video.release()
+
+        else:
+            is_interrupted = False
+            img = cv2.imread(os.path.join(args.imfile))
+            photo_name = args.imfile.split('.')[0].split('/')[-1]
+            os.makedirs(args.outputdir, exist_ok=True)
+            new_path = args.outputdir
+            
+            im_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             w, h = im_pil.size
             orig_size = torch.tensor([w, h])[None].to(args.device)
         
@@ -203,31 +268,14 @@ def infer(args, model, name, format = 'video'):
                 T.ToTensor(),
             ])
             im_data = transforms(im_pil)[None].to(args.device)
-                
             output = model(im_data, orig_size)
             labels, boxes, scores = output
-                
-            detect_frame, box_count = draw([im_pil], labels, boxes, scores, 0.5)
-            
+            detect_frame, box_count = draw([im_pil], labels, boxes, scores, 0.35)
             frame_out = cv2.cvtColor(np.array(detect_frame), cv2.COLOR_RGB2BGR)
-            # Display inference result
-            frame_placeholder.image(frame_out, channels="BGR", use_container_width=True)
-            output_video.write(frame_out)
-            
-            # Update the progress bar
-            current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-            progress = current_frame / total_frames
-            progress_bar.progress(progress)  # Update progress bar
-            print(f"Progress: {current_frame} / {total_frames}")
+            cv2.imwrite(os.path.join(new_path,f"{photo_name}.jpg"),frame_out)
+            st.image(frame_out, channels="BGR")
 
-            # Collect the frame that is detected
-            if  box_count > 0:
-                detect_annotation.append(current_frame)
-
-                
         # close all the windows
-        cap.release()
-        output_video.release()
         cv2.destroyAllWindows()
         if is_interrupted:
             st.info("推理過程已停止。")
