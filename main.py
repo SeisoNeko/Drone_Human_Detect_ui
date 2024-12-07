@@ -113,7 +113,6 @@ def main():
                     file_type = "video" if Video_Type[i] else "photo"
                     save_path = f"inputFile/{base_name}/{uuid_name}"
                     output_path = f"outputFile/{uuid_name.split('.')[0]}"
-                    print(f"save_path: {save_path}, output_path: {output_path}")
                     if not Video_Type[i]:   
                         save_path = f"inputFile/photo/{uuid_name}"
                         output_path = f"outputFile/photo"
@@ -142,6 +141,13 @@ def main():
             # 清理掉臨時檔案
     st.button("清理臨時檔案", on_click=lambda: cleanup_files())
 
+#
+#   Zip output files function:
+#       parameters: None
+#       function:
+#           1. Zip all the output files in the outputFile directory
+#           2. Return the path of the zip file
+#
 def zip_output_files():
     zip_path = "output_files.zip"
     with zipfile.ZipFile(zip_path, 'w') as zipf:
@@ -150,6 +156,13 @@ def zip_output_files():
                 zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), "outputFile"))
     return zip_path
 
+#
+#   Zip log files function:
+#       parameters: None
+#       function:
+#           1. Zip all the log files in the log directory
+#           2. Return the path of the zip file
+#
 def zip_log_files():
     log_zip_path = "log_files.zip"
     with zipfile.ZipFile(log_zip_path, 'w') as zipf:
@@ -158,6 +171,16 @@ def zip_log_files():
                 zipf.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), "log"))
     return log_zip_path
 
+#
+#   Cleanup_files function:
+#       parameters: None
+#       function:
+#           1. Remove the inputFile, outputFile, and log directories
+#           2. Remove the output_files.zip and log_files.zip
+#           3. Reset the session state variables
+#           4. Display a success message if the cleanup is successful
+#           5. Display an error message if the cleanup fails, but continue the program execution
+#
 def cleanup_files():
     try:
         shutil.rmtree("inputFile", ignore_errors=True)
@@ -173,23 +196,51 @@ def cleanup_files():
     except OSError as e:
         st.error(f"清除檔案失敗: {e}")
         pass
-    
+
+#
+#   Find uuid name function:
+#       parameters:
+#           name: the name of the file
+#           name_mapping_table: a list of tuples containing old and new names
+#       function:
+#           1. Find the new name of the file in the name_mapping_table
+#           2. Return the new name if it is found, otherwise return None
+#   
 def find_uuid_name(name, name_mapping_table):
     for old_name, new_name in name_mapping_table:
         if name == old_name:
             return new_name
     return None
 
+#
+#   Change name to uuid function:
+#       parameters:
+#           file_name: the name of the file
+#           name_mapping_table: a list of tuples containing old and new names
+#       function:
+#           1. Change the name of the file to a uuid name if the file is not in the name_mapping_table
+#           2. Return the new name and the updated name_mapping_table
+#
 def change_name_to_uuid(file_name, name_mapping_table):
     finding_result = find_uuid_name(file_name, name_mapping_table)
     if finding_result is None:
         new_name = str(uuid.uuid4()) + '.' + file_name.split('.')[-1]
-        print(f"new_name: {new_name}")
         name_mapping_table.append((file_name, new_name))
         return new_name, name_mapping_table
     else:
         return finding_result, name_mapping_table
 
+#
+#   Recover function:
+#       parameters:
+#           name: the new name of the file
+#           name_mapping_table: a list of tuples containing old and new names
+#           type: the type of file, either "video" or "photo"
+#       function:
+#           1. Recover the original name of the file
+#           2. Rename the file back to its original name
+#           3. Return the old name and the new output path
+#
 def  recover_name(name, name_mapping_table, type):
     for old_name, new_name in name_mapping_table:
         if name == new_name:
@@ -202,17 +253,17 @@ def  recover_name(name, name_mapping_table, type):
                 new_output_path = f"outputFile/photo/{old_name}"
             return old_name, new_output_path
             
-# '''
+#
 # Infer function : 
-#     parameters: 
-#         args:  paramerters for model initialize, including the path for 
-#                input and output file and type of data
-#         model: use for inference
-#     function:
-#         1. Inference the data from user input 
-#         2. The interrupt button to stop the inference
-#         3. real time inference strealit: 0.5(s), cv2: 0.01(s) 
-# '''
+#    parameters: 
+#        args:  paramerters for model initialize, including the path for 
+#            input and output file and type of data
+#        model: use for inference
+#    function:
+#        1. Inference the data from user input 
+#        2. The interrupt button to stop the inference
+#        3. real time inference strealit: 0.5(s), cv2: 0.01(s) 
+#
 def infer(args, model, name):
 
     detect_annotation = []
@@ -320,7 +371,17 @@ def infer(args, model, name):
         else:
             st.success("推理完成")
         return detect_annotation
-         
+
+#
+#   Make log function:
+#       parameters:
+#           detect_annotation: the frame number that is detected
+#           fps: the frame per second of the video
+#           file_name: the name of the file
+#       function:
+#           1. Create a log file to save the frame number that is detected
+#           2. Return the path of the log file
+#        
 def make_log(detect_annotation, fps, file_name):
     os.makedirs("log", exist_ok=True)
     log_path = os.path.join("log", file_name + '.txt')
