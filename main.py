@@ -10,6 +10,7 @@ import numpy as np
 import cv2
 import zipfile
 import shutil
+import uuid
 from rtdetr.tools.infer import InitArgs, draw, initModel
 from anomalyDET import anomaly_main
 
@@ -33,6 +34,9 @@ def main():
             st.session_state.infer_correct = False
         if 'has_infer_result' not in st.session_state:
             st.session_state.has_infer_result = False
+        if 'name_mapping_table' not in st.session_state:
+            st.session_state.name_mapping_table = []
+        name_mapping_table = st.session_state.name_mapping_table
 
         for uploaded_file in uploaded_files:
             file_name = uploaded_file.name
@@ -62,11 +66,13 @@ def main():
 
             # create dir of to save the input file and inference outcome
             base_name = file_name.split('.')[0]
+            uuid_name, name_mapping_table = change_name_to_uuid(file_name, name_mapping_table)
+
             if Video_Type[-1]:  # 影片檔
-                input_dir = os.path.join("inputFile", base_name)
+                input_dir = os.path.join("inputFile", uuid_name.split('.')[0])
             else:  # 圖片檔
                 input_dir = os.path.join("inputFile", "photo")
-            output_dir = os.path.join("outputFile", base_name)
+            output_dir = os.path.join("outputFile", uuid_name.split('.')[0])
             
             try:
                 os.makedirs(input_dir, exist_ok=True)
@@ -78,7 +84,7 @@ def main():
 
 
             # copy the video to inputFile
-            save_path = os.path.join(input_dir, file_name)
+            save_path = os.path.join(input_dir, uuid_name)
             try:
                 with open(save_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
@@ -101,19 +107,23 @@ def main():
             for i, uploaded_file in enumerate(uploaded_files):
                 file_name = uploaded_file.name
                 if st.session_state.detect_annotations[file_name] is None:
-                    base_name = file_name.split('.')[0]
+                    uuid_name = find_uuid_name(file_name, name_mapping_table)
+                    base_name = uuid_name.split('.')[0]
                     file_extension = file_name.split('.')[-1]
-                    save_path = f"inputFile/{base_name}/{file_name}"
-                    output_path = f"outputFile/{base_name}"
+                    file_type = "video" if Video_Type[i] else "photo"
+                    save_path = f"inputFile/{base_name}/{uuid_name}"
+                    output_path = f"outputFile/{uuid_name.split('.')[0]}"
+                    print(f"save_path: {save_path}, output_path: {output_path}")
                     if not Video_Type[i]:   
-                        save_path = f"inputFile/photo/{file_name}"
+                        save_path = f"inputFile/photo/{uuid_name}"
                         output_path = f"outputFile/photo"
                     args = InitArgs(save_path, Video_Type[i], output_path, device)
                     model = initModel(args)
                     st.session_state.detect_annotations[file_name] = infer(args, model, base_name)
+                    original_name, new_output_path = recover_name(uuid_name, name_mapping_table, file_type)
                     if file_extension in video_format:
-                        st.video(os.path.join(output_path, base_name+".mp4"))
-                        log_path = make_log(st.session_state.detect_annotations[file_name], fps, base_name)
+                        st.video(new_output_path)
+                        log_path = make_log(st.session_state.detect_annotations[file_name], fps, original_name.split('.')[0])
                         st.success(f"偵測結果已儲存至 {log_path}")
             st.session_state.infer_correct = False
             st.session_state.has_infer_result = True
@@ -164,6 +174,34 @@ def cleanup_files():
         st.error(f"清除檔案失敗: {e}")
         pass
     
+def find_uuid_name(name, name_mapping_table):
+    for old_name, new_name in name_mapping_table:
+        if name == old_name:
+            return new_name
+    return None
+
+def change_name_to_uuid(file_name, name_mapping_table):
+    finding_result = find_uuid_name(file_name, name_mapping_table)
+    if finding_result is None:
+        new_name = str(uuid.uuid4()) + '.' + file_name.split('.')[-1]
+        print(f"new_name: {new_name}")
+        name_mapping_table.append((file_name, new_name))
+        return new_name, name_mapping_table
+    else:
+        return finding_result, name_mapping_table
+
+def  recover_name(name, name_mapping_table, type):
+    for old_name, new_name in name_mapping_table:
+        if name == new_name:
+            if type == "video":
+                os.rename(f"outputFile/{new_name.split('.')[0]}", f"outputFile/{old_name.split('.')[0]}")
+                os.rename(f"outputFile/{old_name.split('.')[0]}/{new_name}", f"outputFile/{old_name.split('.')[0]}/{old_name}")
+                new_output_path = f"outputFile/{old_name.split('.')[0]}/{old_name}"
+            else:
+                os.rename(f"outputFile/photo/{new_name}", f"outputFile/photo/{old_name}")
+                new_output_path = f"outputFile/photo/{old_name}"
+            return old_name, new_output_path
+            
 # '''
 # Infer function : 
 #     parameters: 
