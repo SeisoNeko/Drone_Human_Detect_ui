@@ -37,13 +37,6 @@
     install.bat
     ```
 
-    **Linux:**
-
-    ```bash
-    ./install.sh
-    ```
-
-
 5. 放入model  
     請致 rtdetr/weights/ 放入合適的model pth檔  
     並到 rtdetr\tools\infer.py 第256行 輸入model路徑
@@ -53,12 +46,12 @@
 1. 啟動 Streamlit 應用：
 
     ```bash
-    streamlit run main.py
+    streamlit run main.py --server.maxUploadSize 10000
     ```
 
-2. 或者 執行run.py
+2. 或者 執行run.bat
     ```bash
-    python run.py
+    run.bat
     ```
 
 3. 在瀏覽器中打開 `http://localhost:8501`，上傳圖片或影片進行無人機辨識。
@@ -67,8 +60,8 @@
 
 - `main.py`：主應用程式碼
 - `requirements.txt`：所需的 Python 套件
-- `model/`：存放 RTDETR 模型的目錄
-- `result/`：存放預測結果的目錄
+- `weights/`：存放 RTDETR 模型(checkpoints)的目錄
+- `outputFile/`：存放預測結果的目錄
 
 ## 依賴項目
 
@@ -76,10 +69,14 @@
 - Streamlit
 - ultralytics
 - PIL (Pillow)
+- cv2
 
 ## 貢獻
 
 歡迎提交問題和請求合併。如果您想貢獻代碼，創建一個 Pull Request。
+
+## 備註
+- 本專案使用cuda11.8版本，建議先行安裝適合於本地的cuda tool kit
 
 ## 授權
 
