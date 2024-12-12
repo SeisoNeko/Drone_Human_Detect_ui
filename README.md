@@ -69,10 +69,14 @@
 - Streamlit
 - ultralytics
 - PIL (Pillow)
+- cv2
 
 ## 貢獻
 
 歡迎提交問題和請求合併。如果您想貢獻代碼，創建一個 Pull Request。
+
+## 備註
+- 本專案使用cuda11.8版本，建議先行安裝適合於本地的cuda tool kit
 
 ## 授權
 
