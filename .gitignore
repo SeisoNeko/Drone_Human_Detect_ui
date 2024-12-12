@@ -141,3 +141,5 @@ outputZip
 torchTest.py
 log_files.zip
 output_files.zip
+run.exe
+run_no_conda.exe

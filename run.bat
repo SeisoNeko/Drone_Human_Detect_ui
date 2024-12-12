@@ -1,6 +1,6 @@
 @echo off
 set CONDA_EXE=""
-for /f "delims=" %%i in ('where conda.exe 2^>nul') do set CONDA_EXE=%%i
+for %%i in (conda.exe) do set CONDA_EXE=%%i
 if "%CONDA_EXE%"=="" (
     echo Conda is not installed.
     python -m streamlit run main.py --server.maxUploadSize 10000
