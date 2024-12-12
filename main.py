@@ -118,7 +118,7 @@ def main():
                         output_path = f"outputFile/photo"
                     args = InitArgs(save_path, Video_Type[i], output_path, device)
                     model = initModel(args)
-                    st.session_state.detect_annotations[file_name] = infer(args, model, base_name)
+                    st.session_state.detect_annotations[file_name] = infer(args, model, base_name, file_extension)
                     original_name, new_output_path = recover_name(uuid_name, name_mapping_table, file_type)
                     if file_extension in video_format:
                         st.video(new_output_path)
@@ -265,7 +265,7 @@ def  recover_name(name, name_mapping_table, type):
 #        2. The interrupt button to stop the inference
 #        3. real time inference strealit: 0.5(s), cv2: 0.01(s) 
 #
-def infer(args, model, name):
+def infer(args, model, name, format):
 
     detect_annotation = []
     if st.session_state.infer_correct:
@@ -362,7 +362,7 @@ def infer(args, model, name):
             labels, boxes, scores = output
             detect_frame, box_count = draw([im_pil], labels, boxes, scores, 0.35)
             frame_out = cv2.cvtColor(np.array(detect_frame), cv2.COLOR_RGB2BGR)
-            cv2.imwrite(os.path.join(new_path,f"{photo_name}.jpg"),frame_out)
+            cv2.imwrite(os.path.join(new_path,f"{photo_name}.{format}"),frame_out)
             st.image(frame_out, channels="BGR")
 
         # close all the windows
