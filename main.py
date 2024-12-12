@@ -58,7 +58,7 @@ def main():
             upload_success = st.success(f"檔案 {file_name} 已成功上傳！")
             if file_extension in image_format:
                 st.image(uploaded_file)
-            elif file_extension in video_format:    
+            elif file_extension in video_format:
                 st.video(uploaded_file)
             else:
                 st.warning(f"檔案 {file_name} 格式不支援！")
@@ -183,16 +183,17 @@ def zip_log_files():
 #
 def cleanup_files():
     try:
+        st.session_state.last_uploaded_files = []
+        st.session_state.detect_annotations = {}
+        st.session_state.infer_correct = False
+        st.session_state.has_infer_result = False
         shutil.rmtree("inputFile", ignore_errors=True)
         shutil.rmtree("outputFile", ignore_errors=True)
         shutil.rmtree("log", ignore_errors=True)
         os.remove("output_files.zip")
         os.remove("log_files.zip")
         st.success("成功清理所有臨時檔案.")
-        st.session_state.last_uploaded_files = []
-        st.session_state.detect_annotations = {}
-        st.session_state.infer_correct = False
-        st.session_state.has_infer_result = False
+
     except OSError as e:
         st.error(f"清除檔案失敗: {e}")
         pass
